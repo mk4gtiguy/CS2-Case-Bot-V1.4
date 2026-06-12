@@ -1,0 +1,1908 @@
+CS2 Case Bot V1.4 — Complete Code Reference
+Created by Mk4gtiguy | For Streamer.bot v1.0.4+
+
+COMMANDS SUMMARY
+Command	Description	Permission
+!setcase [name]	Change your active case	Everyone
+!case	Open your selected case	Everyone
+!inv	View your inventory counts	Everyone
+!sell	Show numbered inventory	Everyone
+!sell [number]	Sell specific item	Everyone
+!sellall	Sell entire inventory	Everyone
+!sellhelp	Selling instructions	Everyone
+!balance	Check your balance	Everyone
+!daily	Claim daily reward ($5-$25)	Everyone
+!tradeup	Trade 10 Blues for a Purple	Everyone
+!streak	Check your open streak	Everyone
+!badges	View earned achievements	Everyone
+!trade @user #	Trade an item	Everyone
+!accepttrade	Accept a trade offer	Everyone
+!denytrade	Deny a trade offer	Everyone
+!gift @user [case]	Gift a case to someone	Everyone
+!jackpot	Enter jackpot with random item	Everyone
+!jackpotinfo	See current jackpot status	Everyone
+!jackpotdraw	Draw jackpot winner	Mods only
+!mystats	Your personal case stats	Everyone
+!casestats	Total opens per case	Everyone
+!caseinfo	List available cases with prices	Everyone
+!odds	Show drop rates	Everyone
+!inventoryvalue	Show your inventory value	Everyone
+!topmoney	Top 5 balances	Everyone
+!topinventory	Top 5 inventory values	Everyone
+!topgolds	Top 5 gold pullers	Everyone
+!topopens	Top 5 most cases opened	Everyone
+!help	Show all commands	Everyone
+Admin Commands (Moderator+)
+Command	Description
+!givebalance @user amount	Add money to user
+!takebalance @user amount	Remove money from user
+!giveitem @user "item"	Give item to user
+!resetuser @user	Reset user's data
+!setcaseprice Case price	Change case cost
+RARITY ODDS
+Rarity	Emoji	Chance	Base Value
+Gold (Knife/Gloves)	🟡	2.6%	$50.00
+Red (Covert)	🔴	2.5%	$5.00
+Pink (Classified)	💗	2.5%	$1.50
+Purple (Restricted)	🟣	5.0%	$0.50
+Blue (Mil-Spec)	🔷	87.4%	$0.10
+Condition Multipliers
+Condition	Chance	Multiplier
+Factory New (FN)	5%	2.0x
+Minimal Wear (MW)	15%	1.5x
+Field-Tested (FT)	50%	1.0x
+Well-Worn (WW)	20%	0.75x
+Battle-Scarred (BS)	10%	0.5x
+Special Features
+StatTrak™: 10% chance, 2x sell value
+
+Streak Bonuses: 10 ($5), 25 ($15), 50 ($50), 100 ($200)
+
+Case Unlocks: New case every 25 opens
+
+CASE COSTS
+Case	Cost
+Recoil	$0.50
+Dreams	$1.50
+Revolution	$1.50
+Kilowatt	$2.00
+Fracture	$2.00
+Horizon	$2.00
+Chroma3	$2.00
+Clutch	$3.00
+Prisma	$2.50
+DangerZone	$2.50
+Spectrum2	$2.50
+ACTION: CS2_OpenCase
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        var random = new Random();
+        
+        // Get user and case
+        string user = CPH.GetGlobalVar<string>("User");
+        string currentCase = CPH.GetGlobalVar<string>("CurrentCase");
+        string casePrefix = currentCase.Replace(" ", "").Replace("&", "").Replace("-", "");
+        
+        // Check streak
+        int currentStreak = CPH.GetGlobalVar<int>(user + "_OpenStreak");
+        currentStreak++;
+        CPH.SetGlobalVar(user + "_OpenStreak", currentStreak, true);
+        
+        // Check for streak bonuses
+        if (currentStreak == 10 || currentStreak == 25 || currentStreak == 50 || currentStreak == 100)
+        {
+            double bonus = 0;
+            if (currentStreak == 10) bonus = 5.00;
+            else if (currentStreak == 25) bonus = 15.00;
+            else if (currentStreak == 50) bonus = 50.00;
+            else if (currentStreak == 100) bonus = 200.00;
+            
+            double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+            balance += bonus;
+            CPH.SetGlobalVar(user + "_Balance", balance, true);
+            CPH.SendMessage("🔥 " + user + " reached a " + currentStreak + " open streak! Bonus $" + bonus.ToString("F2") + " added!");
+        }
+        
+        // Roll rarity
+        int roll = random.Next(1, 1001);
+        string rarityType;
+        if (roll <= 26) rarityType = "Gold";
+        else if (roll >= 975) rarityType = "Red";
+        else if (roll >= 950) rarityType = "Pink";
+        else if (roll >= 900) rarityType = "Purple";
+        else rarityType = "Blue";
+        
+        // Base values
+        string emoji;
+        double baseValue;
+        if (rarityType == "Gold") { emoji = "🟡"; baseValue = 50.00; }
+        else if (rarityType == "Red") { emoji = "🔴"; baseValue = 5.00; }
+        else if (rarityType == "Pink") { emoji = "💗"; baseValue = 1.50; }
+        else if (rarityType == "Purple") { emoji = "🟣"; baseValue = 0.50; }
+        else { emoji = "🔷"; baseValue = 0.10; }
+        
+        // Get skin
+        string skinList = CPH.GetGlobalVar<string>(casePrefix + rarityType + "List");
+        if (string.IsNullOrEmpty(skinList)) skinList = CPH.GetGlobalVar<string>(rarityType + "List");
+        
+        var validSkins = new List<string>();
+        foreach (string skin in skinList.Split(';'))
+            if (!string.IsNullOrWhiteSpace(skin))
+                validSkins.Add(skin.Trim());
+        
+        string currentSkin = validSkins[random.Next(0, validSkins.Count)];
+        
+        // Apply condition (FN, MW, FT, WW, BS)
+        string[] conditions = { "Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred" };
+        double[] conditionMultipliers = { 2.0, 1.5, 1.0, 0.75, 0.5 };
+        int conditionRoll = random.Next(1, 101);
+        int conditionIndex = 0;
+        if (conditionRoll <= 5) conditionIndex = 0;
+        else if (conditionRoll <= 20) conditionIndex = 1;
+        else if (conditionRoll <= 70) conditionIndex = 2;
+        else if (conditionRoll <= 90) conditionIndex = 3;
+        else conditionIndex = 4;
+        
+        string condition = conditions[conditionIndex];
+        double finalValue = baseValue * conditionMultipliers[conditionIndex];
+        
+        // Apply StatTrak (10% chance)
+        bool isStatTrak = random.Next(1, 101) <= 10;
+        if (isStatTrak)
+        {
+            finalValue *= 2;
+        }
+        
+        string statTrakTag = isStatTrak ? " (StatTrak™)" : "";
+        string newItem = emoji + " " + currentSkin + " (" + condition + ")" + statTrakTag;
+        
+        // Save to inventory
+        string oldItems = CPH.GetGlobalVar<string>(user + "_Items");
+        string newItemsList = string.IsNullOrEmpty(oldItems) ? newItem : oldItems + ";" + newItem;
+        CPH.SetGlobalVar(user + "_Items", newItemsList, true);
+        
+        // Track case opens
+        string caseKey = casePrefix + "_Opened";
+        int caseOpened = CPH.GetGlobalVar<int>(caseKey);
+        CPH.SetGlobalVar(caseKey, caseOpened + 1, true);
+        
+        int userCaseOpened = CPH.GetGlobalVar<int>(user + "_" + casePrefix + "_Opened");
+        CPH.SetGlobalVar(user + "_" + casePrefix + "_Opened", userCaseOpened + 1, true);
+        
+        int totalOpened = CPH.GetGlobalVar<int>(user + "_TotalOpened");
+        CPH.SetGlobalVar(user + "_TotalOpened", totalOpened + 1, true);
+        
+        // Check case unlocks (every 25 opens unlocks a new case)
+        string unlockedCases = CPH.GetGlobalVar<string>(user + "_UnlockedCases");
+        if (string.IsNullOrEmpty(unlockedCases)) unlockedCases = "Dreams;Recoil";
+        
+        int totalCasesOpened = totalOpened + 1;
+        if (totalCasesOpened >= 25 && !unlockedCases.Contains("Kilowatt"))
+        {
+            unlockedCases += ";Kilowatt";
+            CPH.SendMessage("🔓 " + user + " unlocked the Kilowatt case! Type !setcase Kilowatt to try it!");
+        }
+        if (totalCasesOpened >= 50 && !unlockedCases.Contains("Revolution"))
+        {
+            unlockedCases += ";Revolution";
+            CPH.SendMessage("🔓 " + user + " unlocked the Revolution case!");
+        }
+        if (totalCasesOpened >= 75 && !unlockedCases.Contains("Fracture"))
+        {
+            unlockedCases += ";Fracture";
+            CPH.SendMessage("🔓 " + user + " unlocked the Fracture case!");
+        }
+        if (totalCasesOpened >= 100 && !unlockedCases.Contains("Clutch"))
+        {
+            unlockedCases += ";Clutch";
+            CPH.SendMessage("🔓 " + user + " unlocked the Clutch case!");
+        }
+        if (totalCasesOpened >= 150 && !unlockedCases.Contains("Prisma"))
+        {
+            unlockedCases += ";Prisma";
+            CPH.SendMessage("🔓 " + user + " unlocked the Prisma case!");
+        }
+        if (totalCasesOpened >= 200 && !unlockedCases.Contains("DangerZone"))
+        {
+            unlockedCases += ";DangerZone";
+            CPH.SendMessage("🔓 " + user + " unlocked the Danger Zone case!");
+        }
+        CPH.SetGlobalVar(user + "_UnlockedCases", unlockedCases, true);
+        
+        // Track rarity counts
+        string rarityCounterKey = user + "_" + rarityType + "s";
+        int rarityCount = CPH.GetGlobalVar<int>(rarityCounterKey);
+        CPH.SetGlobalVar(rarityCounterKey, rarityCount + 1, true);
+        
+        // Check achievements
+        string achievements = CPH.GetGlobalVar<string>(user + "_Achievements");
+        if (string.IsNullOrEmpty(achievements)) achievements = "";
+        
+        if (rarityType == "Gold" && !achievements.Contains("FirstGold"))
+        {
+            achievements += (achievements == "" ? "" : ";") + "FirstGold";
+            CPH.SendMessage("🏆 " + user + " earned the 'First Gold' achievement!");
+        }
+        
+        int tradeupCount = CPH.GetGlobalVar<int>(user + "_TradeupCount");
+        if (tradeupCount >= 10 && !achievements.Contains("TradeUpMaster"))
+        {
+            achievements += (achievements == "" ? "" : ";") + "TradeUpMaster";
+            CPH.SendMessage("🏆 " + user + " earned the 'Trade Up Master' achievement!");
+        }
+        
+        int jackpotWins = CPH.GetGlobalVar<int>(user + "_JackpotWins");
+        if (jackpotWins >= 1 && !achievements.Contains("JackpotWinner"))
+        {
+            achievements += (achievements == "" ? "" : ";") + "JackpotWinner";
+            CPH.SendMessage("🏆 " + user + " earned the 'Jackpot Winner' achievement!");
+        }
+        
+        // Check if they've opened all case types
+        string[] allCases = { "Dreams", "Recoil", "Kilowatt", "Revolution", "Fracture", "Clutch", "Prisma", "DangerZone", "Horizon", "Chroma3", "Spectrum2" };
+        int openedCount = 0;
+        foreach (string c in allCases)
+        {
+            int count = CPH.GetGlobalVar<int>(user + "_" + c.Replace(" ", "") + "_Opened");
+            if (count > 0) openedCount++;
+        }
+        if (openedCount >= 6 && !achievements.Contains("CaseCollector"))
+        {
+            achievements += (achievements == "" ? "" : ";") + "CaseCollector";
+            CPH.SendMessage("🏆 " + user + " earned the 'Case Collector' achievement!");
+        }
+        
+        CPH.SetGlobalVar(user + "_Achievements", achievements, true);
+        
+        // Gold tracking
+        if (rarityType == "Gold")
+        {
+            int userGolds = CPH.GetGlobalVar<int>(user + "_Golds");
+            CPH.SetGlobalVar(user + "_Golds", userGolds + 1, true);
+            int totalGolds = CPH.GetGlobalVar<int>("GoldPulls_Total");
+            CPH.SetGlobalVar("GoldPulls_Total", totalGolds + 1, true);
+        }
+        
+        // Track all users
+        string allUsers = CPH.GetGlobalVar<string>("AllUsers");
+        if (string.IsNullOrEmpty(allUsers)) allUsers = user;
+        else
+        {
+            bool userExists = false;
+            foreach (string existingUser in allUsers.Split('§'))
+                if (existingUser.Equals(user, StringComparison.OrdinalIgnoreCase))
+                { userExists = true; break; }
+            if (!userExists) allUsers += "§" + user;
+        }
+        CPH.SetGlobalVar("AllUsers", allUsers, true);
+        
+        CPH.SetGlobalVar("CurrentSkin", currentSkin, true);
+        CPH.SetGlobalVar("RarityType", rarityType, true);
+        CPH.SetGlobalVar("Emoji", emoji, true);
+        CPH.SetGlobalVar("Value", finalValue.ToString("F2"), true);
+        CPH.SetGlobalVar("CurrentValue", finalValue, true);
+        
+        // DELAYED OPENING - 2.5 second wait for suspense
+        System.Threading.Thread.Sleep(2500);
+        
+        CPH.SendMessage("🎁 " + user + " opened " + currentCase + " and got: " + newItem + " (Value: $" + finalValue.ToString("F2") + ")");
+        return true;
+    }
+}
+ACTION: SetCase_Command (!setcase)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string rawInput = args["rawInput"].ToString();
+        
+        string caseName = rawInput.Replace("!setcase", "").Trim();
+        
+        // All available cases
+        string[] allCases = { "Dreams", "Recoil", "Kilowatt", "Revolution", "Fracture", "Clutch", "Prisma", "DangerZone", "Horizon", "Chroma3", "Spectrum2" };
+        bool isValid = false;
+        
+        foreach (string validCase in allCases)
+        {
+            if (caseName.Equals(validCase, StringComparison.OrdinalIgnoreCase))
+            {
+                caseName = validCase;
+                isValid = true;
+                break;
+            }
+        }
+        
+        if (!isValid)
+        {
+            CPH.SendMessage("📦 " + user + " Unknown case: '" + caseName + "' | Available: Dreams, Recoil, Kilowatt, Revolution, Fracture, Clutch, Prisma, DangerZone, Horizon, Chroma3, Spectrum2");
+            return false;
+        }
+        
+        // Check if unlocked
+        string unlockedCases = CPH.GetGlobalVar<string>(user + "_UnlockedCases");
+        if (string.IsNullOrEmpty(unlockedCases)) unlockedCases = "Dreams;Recoil";
+        
+        if (!unlockedCases.Contains(caseName) && caseName != "Dreams" && caseName != "Recoil")
+        {
+            CPH.SendMessage("🔒 " + user + " you haven't unlocked " + caseName + " yet! Keep opening cases to unlock more!");
+            return false;
+        }
+        
+        CPH.SetGlobalVar(user + "_LastCase", caseName, true);
+        
+        // Get cost for display
+        double cost = 1.50;
+        if (caseName.Equals("Recoil", StringComparison.OrdinalIgnoreCase)) cost = 0.50;
+        else if (caseName.Equals("Fracture", StringComparison.OrdinalIgnoreCase) || 
+                 caseName.Equals("Kilowatt", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (caseName.Equals("Clutch", StringComparison.OrdinalIgnoreCase)) cost = 3.00;
+        else if (caseName.Equals("Prisma", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        else if (caseName.Equals("DangerZone", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        else if (caseName.Equals("Horizon", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (caseName.Equals("Chroma3", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (caseName.Equals("Spectrum2", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        
+        CPH.SendMessage("📦 " + user + " switched to " + caseName + " case! ($" + cost.ToString("F2") + " per open) | Type !case to open it.");
+        return true;
+    }
+}
+ACTION: Case_Command (!case)
+Must have Sub-Action: Run Action → CS2_OpenCase
+
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string currentCase = CPH.GetGlobalVar<string>(user + "_LastCase");
+        
+        if (string.IsNullOrEmpty(currentCase))
+        {
+            CPH.SendMessage(user + " please set a case first with !setcase Dreams (or Recoil, Kilowatt, etc.)");
+            return false;
+        }
+        
+        CPH.SetGlobalVar("User", user, true);
+        CPH.SetGlobalVar("CurrentCase", currentCase, true);
+        
+        // Get case prefix for cost calculation
+        string casePrefix = currentCase.Replace(" ", "").Replace("&", "").Replace("-", "");
+        
+        // Determine cost (check for custom price first)
+        double customPrice = CPH.GetGlobalVar<double>("Price_" + currentCase);
+        double cost = customPrice > 0 ? customPrice : 1.50;
+        
+        if (casePrefix.Equals("Recoil", StringComparison.OrdinalIgnoreCase)) cost = 0.50;
+        else if (casePrefix.Equals("Fracture", StringComparison.OrdinalIgnoreCase) || 
+                 casePrefix.Equals("Kilowatt", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (casePrefix.Equals("Clutch", StringComparison.OrdinalIgnoreCase)) cost = 3.00;
+        else if (casePrefix.Equals("Prisma", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        else if (casePrefix.Equals("DangerZone", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        else if (casePrefix.Equals("Horizon", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (casePrefix.Equals("Chroma3", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (casePrefix.Equals("Spectrum2", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        
+        // Check balance
+        double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+        
+        if (balance < cost)
+        {
+            double shortfall = cost - balance;
+            CPH.SendMessage(user + " you need $" + cost.ToString("F2") + " to open " + currentCase + " but only have $" + balance.ToString("F2") + " — you're $" + shortfall.ToString("F2") + " short! Try !daily or !sell.");
+            return false;
+        }
+        
+        // Deduct cost
+        balance -= cost;
+        CPH.SetGlobalVar(user + "_Balance", balance, true);
+        CPH.SetGlobalVar("CaseCost", cost, true);
+        
+        // Show purchase confirmation
+        CPH.SendMessage("🔑 " + user + " bought a " + currentCase + " key for $" + cost.ToString("F2") + " | Balance: $" + balance.ToString("F2"));
+        
+        return true;
+    }
+}
+ACTION: Inv_Command (!inv)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string items = CPH.GetGlobalVar<string>(user + "_Items");
+
+        if (string.IsNullOrEmpty(items))
+        {
+            CPH.SendMessage(user + " Your inventory is empty! Type !setcase Dreams then !case to open a case!");
+            return true;
+        }
+
+        string[] itemList = items.Split(';');
+        
+        int countGold = 0, countRed = 0, countPink = 0, countPurple = 0, countBlue = 0;
+        double totalValue = 0;
+        
+        foreach (string item in itemList)
+        {
+            if (item.Contains("🟡")) { countGold++; totalValue += 50.00; }
+            else if (item.Contains("🔴")) { countRed++; totalValue += 5.00; }
+            else if (item.Contains("💗")) { countPink++; totalValue += 1.50; }
+            else if (item.Contains("🟣")) { countPurple++; totalValue += 0.50; }
+            else if (item.Contains("🔷")) { countBlue++; totalValue += 0.10; }
+            
+            // Apply condition multipliers for value calculation
+            if (item.Contains("Factory New")) totalValue += totalValue;
+            else if (item.Contains("Minimal Wear")) totalValue += totalValue / 2;
+            else if (item.Contains("Well-Worn")) totalValue -= totalValue / 4;
+            else if (item.Contains("Battle-Scarred")) totalValue -= totalValue / 2;
+            
+            // StatTrak
+            if (item.Contains("StatTrak")) totalValue += totalValue;
+        }
+        
+        // Show first few items as examples with numbers
+        string exampleItems = "";
+        for (int i = 0; i < Math.Min(3, itemList.Length); i++)
+        {
+            string shortItem = itemList[i].Length > 25 ? itemList[i].Substring(0, 22) + "..." : itemList[i];
+            exampleItems += (i + 1) + "." + shortItem + " ";
+        }
+        
+        CPH.SendMessage("📦 " + user + "'s Inventory — 🟡 " + countGold + " | 🔴 " + countRed + " | 💗 " + countPink + " | 🟣 " + countPurple + " | 🔷 " + countBlue + " | 💰 $" + totalValue.ToString("F2") + " | Items: " + exampleItems + " | Type !sell to sell items by number!");
+        return true;
+    }
+}
+ACTION: Sell_Command (!sell)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string rawInput = args["rawInput"].ToString();
+        string items = CPH.GetGlobalVar<string>(user + "_Items");
+
+        if (string.IsNullOrEmpty(items))
+        {
+            CPH.SendMessage(user + " Your inventory is empty! Open some cases first with !setcase then !case");
+            return false;
+        }
+
+        string[] itemList = items.Split(';');
+        
+        // Parse which item to sell
+        string[] parts = rawInput.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        int sellIndex = -1;
+        
+        // If no number provided, show inventory with numbers
+        if (parts.Length < 2)
+        {
+            // Show numbered inventory
+            string inventoryList = "";
+            for (int i = 0; i < itemList.Length && i < 10; i++)
+            {
+                // Truncate long item names for cleaner display
+                string shortItem = itemList[i].Length > 40 ? itemList[i].Substring(0, 37) + "..." : itemList[i];
+                inventoryList += (i + 1) + ". " + shortItem + " | ";
+            }
+            if (itemList.Length > 10) inventoryList += "... and " + (itemList.Length - 10) + " more";
+            
+            CPH.SendMessage("📦 " + user + " Type !sell [number] to sell an item. Example: !sell 2 | Your items: " + inventoryList);
+            return false;
+        }
+        
+        // Parse the number
+        if (!int.TryParse(parts[1], out sellIndex))
+        {
+            CPH.SendMessage(user + " Please use a number! Example: !sell 3 | Type !sell alone to see your numbered inventory.");
+            return false;
+        }
+        
+        // Adjust for 1-based indexing
+        sellIndex--;
+        
+        if (sellIndex < 0 || sellIndex >= itemList.Length)
+        {
+            CPH.SendMessage(user + " Invalid item number! You have " + itemList.Length + " items. Type !sell to see them numbered 1-" + itemList.Length);
+            return false;
+        }
+        
+        string soldItem = itemList[sellIndex].Trim();
+
+        // Calculate value with condition and StatTrak multipliers
+        double value = 0.10; // default Blue value
+        
+        // Base value by rarity
+        if (soldItem.Contains("🟡")) value = 50.00;
+        else if (soldItem.Contains("🔴")) value = 5.00;
+        else if (soldItem.Contains("💗")) value = 1.50;
+        else if (soldItem.Contains("🟣")) value = 0.50;
+        else value = 0.10;
+        
+        // Check for condition multipliers
+        if (soldItem.Contains("Factory New")) value *= 2.0;
+        else if (soldItem.Contains("Minimal Wear")) value *= 1.5;
+        else if (soldItem.Contains("Well-Worn")) value *= 0.75;
+        else if (soldItem.Contains("Battle-Scarred")) value *= 0.5;
+        // Field-Tested is 1.0x, no change
+        
+        // Check for StatTrak
+        if (soldItem.Contains("StatTrak")) value *= 2;
+        
+        // Remove the item
+        var newList = new List<string>(itemList);
+        newList.RemoveAt(sellIndex);
+        CPH.SetGlobalVar(user + "_Items", string.Join(";", newList), true);
+
+        // Add to balance
+        double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+        balance += value;
+        CPH.SetGlobalVar(user + "_Balance", balance, true);
+        
+        // Reset streak on sell
+        CPH.SetGlobalVar(user + "_OpenStreak", 0, true);
+        
+        // Show remaining item count
+        int remainingCount = newList.Count;
+        
+        CPH.SendMessage("💰 " + user + " sold " + soldItem + " for $" + value.ToString("F2") + " | New balance: $" + balance.ToString("F2") + " | " + remainingCount + " items left in inventory | Your open streak was reset!");
+        return true;
+    }
+}
+ACTION: SellAll_Command (!sellall)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string items = CPH.GetGlobalVar<string>(user + "_Items");
+
+        if (string.IsNullOrEmpty(items))
+        {
+            CPH.SendMessage(user + " Your inventory is empty! Nothing to sell.");
+            return false;
+        }
+
+        string[] itemList = items.Split(';');
+        double totalValue = 0;
+        
+        // Show confirmation for large inventories
+        if (itemList.Length > 20)
+        {
+            CPH.SendMessage("⚠️ " + user + " You are about to sell ALL " + itemList.Length + " items! Type !sellallconfirm to confirm, or !sellall cancel to abort.");
+            CPH.SetGlobalVar(user + "_PendingSellAll", "true", true);
+            return true;
+        }
+        
+        foreach (string item in itemList)
+        {
+            double value = 0.10;
+            if (item.Contains("🟡")) value = 50.00;
+            else if (item.Contains("🔴")) value = 5.00;
+            else if (item.Contains("💗")) value = 1.50;
+            else if (item.Contains("🟣")) value = 0.50;
+            
+            // Condition multipliers
+            if (item.Contains("Factory New")) value *= 2.0;
+            else if (item.Contains("Minimal Wear")) value *= 1.5;
+            else if (item.Contains("Well-Worn")) value *= 0.75;
+            else if (item.Contains("Battle-Scarred")) value *= 0.5;
+            
+            // StatTrak
+            if (item.Contains("StatTrak")) value *= 2;
+            
+            totalValue += value;
+        }
+        
+        // Clear inventory
+        CPH.SetGlobalVar(user + "_Items", "", true);
+        
+        // Add to balance
+        double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+        balance += totalValue;
+        CPH.SetGlobalVar(user + "_Balance", balance, true);
+        
+        // Reset streak
+        CPH.SetGlobalVar(user + "_OpenStreak", 0, true);
+        
+        // Clear pending flag if exists
+        CPH.SetGlobalVar(user + "_PendingSellAll", "", true);
+        
+        CPH.SendMessage("💰 " + user + " sold ALL " + itemList.Length + " items for $" + totalValue.ToString("F2") + " | New balance: $" + balance.ToString("F2") + " | Your open streak was reset!");
+        return true;
+    }
+}
+ACTION: SellAllConfirm_Command (!sellallconfirm)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string pending = CPH.GetGlobalVar<string>(user + "_PendingSellAll");
+        
+        if (pending != "true")
+        {
+            CPH.SendMessage(user + " You don't have a pending sell-all request. Type !sellall to sell your entire inventory.");
+            return false;
+        }
+        
+        string items = CPH.GetGlobalVar<string>(user + "_Items");
+        if (string.IsNullOrEmpty(items))
+        {
+            CPH.SendMessage(user + " Your inventory is empty!");
+            CPH.SetGlobalVar(user + "_PendingSellAll", "", true);
+            return false;
+        }
+        
+        string[] itemList = items.Split(';');
+        double totalValue = 0;
+        
+        foreach (string item in itemList)
+        {
+            double value = 0.10;
+            if (item.Contains("🟡")) value = 50.00;
+            else if (item.Contains("🔴")) value = 5.00;
+            else if (item.Contains("💗")) value = 1.50;
+            else if (item.Contains("🟣")) value = 0.50;
+            
+            if (item.Contains("Factory New")) value *= 2.0;
+            else if (item.Contains("Minimal Wear")) value *= 1.5;
+            else if (item.Contains("Well-Worn")) value *= 0.75;
+            else if (item.Contains("Battle-Scarred")) value *= 0.5;
+            
+            if (item.Contains("StatTrak")) value *= 2;
+            
+            totalValue += value;
+        }
+        
+        // Clear inventory
+        CPH.SetGlobalVar(user + "_Items", "", true);
+        
+        // Add to balance
+        double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+        balance += totalValue;
+        CPH.SetGlobalVar(user + "_Balance", balance, true);
+        
+        // Reset streak
+        CPH.SetGlobalVar(user + "_OpenStreak", 0, true);
+        
+        // Clear pending flag
+        CPH.SetGlobalVar(user + "_PendingSellAll", "", true);
+        
+        CPH.SendMessage("💰 " + user + " sold ALL " + itemList.Length + " items for $" + totalValue.ToString("F2") + " | New balance: $" + balance.ToString("F2") + " | Your open streak was reset!");
+        return true;
+    }
+}
+ACTION: SellHelp_Command (!sellhelp)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        
+        CPH.SendMessage("💰 " + user + " SELLING GUIDE: 1. Type !sell to see your numbered inventory | 2. Type !sell [number] to sell that item (example: !sell 2) | 3. Type !sellall to sell EVERYTHING (confirmation required for 20+ items) | Selling resets your open streak! | Type !inv to see inventory value");
+        return true;
+    }
+}
+ACTION: Balance_Command (!balance)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+        CPH.SendMessage("💰 " + user + "'s Balance: $" + balance.ToString("F2"));
+        return true;
+    }
+}
+ACTION: Daily_Command (!daily)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string lastDailyStr = CPH.GetGlobalVar<string>(user + "_LastDaily");
+
+        if (!string.IsNullOrEmpty(lastDailyStr))
+        {
+            DateTime lastDaily = DateTime.Parse(lastDailyStr);
+            TimeSpan elapsed = DateTime.UtcNow - lastDaily;
+            if (elapsed.TotalHours < 24)
+            {
+                int hours = 24 - (int)elapsed.TotalHours;
+                CPH.SendMessage(user + " daily already claimed! " + hours + "h remaining.");
+                return false;
+            }
+        }
+
+        var rng = new Random();
+        double reward = rng.Next(500, 2501) / 100.0;
+        double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+        balance += reward;
+
+        CPH.SetGlobalVar(user + "_Balance", balance, true);
+        CPH.SetGlobalVar(user + "_LastDaily", DateTime.UtcNow.ToString(), true);
+        CPH.SendMessage("🎁 " + user + " claimed $" + reward.ToString("F2") + " from !daily! | Balance: $" + balance.ToString("F2"));
+        return true;
+    }
+}
+ACTION: Tradeup_Command (!tradeup)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string items = CPH.GetGlobalVar<string>(user + "_Items");
+
+        if (string.IsNullOrEmpty(items)) 
+        { 
+            CPH.SendMessage(user + " your inventory is empty!"); 
+            return false; 
+        }
+
+        string[] itemList = items.Split(';');
+        int blueCount = 0;
+        
+        foreach (string item in itemList)
+        {
+            if (item.Contains("🔷")) blueCount++;
+        }
+
+        if (blueCount < 10)
+        {
+            CPH.SendMessage(user + " you need 10 🔷 Blue skins to trade up! You have " + blueCount + ". Type !inv to see your inventory.");
+            return false;
+        }
+
+        // Remove exactly 10 blue items
+        var newList = new List<string>(itemList);
+        int removed = 0;
+        for (int i = newList.Count - 1; i >= 0 && removed < 10; i--)
+        {
+            if (newList[i].Contains("🔷")) 
+            { 
+                newList.RemoveAt(i); 
+                removed++; 
+            }
+        }
+
+        // Get current case for purple skin
+        string currentCase = CPH.GetGlobalVar<string>("CurrentCase");
+        string casePrefix = string.IsNullOrEmpty(currentCase) ? "Dreams" : currentCase.Replace(" ", "").Replace("&", "").Replace("-", "");
+        string purpleList = CPH.GetGlobalVar<string>(casePrefix + "PurpleList");
+        
+        if (string.IsNullOrEmpty(purpleList))
+        {
+            CPH.SendMessage(user + " error: no purple skins found for " + currentCase + " case!");
+            return false;
+        }
+
+        string[] purples = purpleList.Split(';');
+        var rng = new Random();
+        string newSkin = purples[rng.Next(0, purples.Length)].Trim();
+        
+        // Add condition and possible StatTrak to the new purple item
+        string[] conditions = { "Factory New", "Minimal Wear", "Field-Tested", "Well-Worn", "Battle-Scarred" };
+        int conditionRoll = rng.Next(1, 101);
+        int conditionIndex = 0;
+        if (conditionRoll <= 5) conditionIndex = 0;
+        else if (conditionRoll <= 20) conditionIndex = 1;
+        else if (conditionRoll <= 70) conditionIndex = 2;
+        else if (conditionRoll <= 90) conditionIndex = 3;
+        else conditionIndex = 4;
+        
+        string condition = conditions[conditionIndex];
+        
+        bool isStatTrak = rng.Next(1, 101) <= 10;
+        string statTrakTag = isStatTrak ? " (StatTrak™)" : "";
+        
+        string newItem = "🟣 " + newSkin + " (" + condition + ")" + statTrakTag;
+        newList.Add(newItem);
+
+        CPH.SetGlobalVar(user + "_Items", string.Join(";", newList), true);
+        
+        // Track tradeup count for achievements
+        int tradeupCount = CPH.GetGlobalVar<int>(user + "_TradeupCount");
+        tradeupCount++;
+        CPH.SetGlobalVar(user + "_TradeupCount", tradeupCount, true);
+        
+        CPH.SendMessage("🎉 " + user + " traded up 10 🔷 Blues and got: " + newItem + "!");
+        return true;
+    }
+}
+ACTION: Streak_Command (!streak)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        int streak = CPH.GetGlobalVar<int>(user + "_OpenStreak");
+        
+        string nextBonus = "";
+        if (streak < 10) nextBonus = "10 opens ($5 bonus)";
+        else if (streak < 25) nextBonus = "25 opens ($15 bonus)";
+        else if (streak < 50) nextBonus = "50 opens ($50 bonus)";
+        else if (streak < 100) nextBonus = "100 opens ($200 bonus)";
+        else nextBonus = "MAX! Keep going!";
+        
+        int currentBonus = 0;
+        if (streak >= 100) currentBonus = 200;
+        else if (streak >= 50) currentBonus = 50;
+        else if (streak >= 25) currentBonus = 15;
+        else if (streak >= 10) currentBonus = 5;
+        
+        CPH.SendMessage("🔥 " + user + " current open streak: " + streak + " | Next bonus: " + nextBonus + " | Last bonus earned: $" + currentBonus);
+        return true;
+    }
+}
+ACTION: Badges_Command (!badges)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string achievements = CPH.GetGlobalVar<string>(user + "_Achievements");
+        
+        if (string.IsNullOrEmpty(achievements))
+        {
+            CPH.SendMessage("🏆 " + user + " has no badges yet! Open cases, trade up, or win jackpots to earn them!");
+            return true;
+        }
+        
+        string badgeList = "";
+        int badgeCount = 0;
+        
+        if (achievements.Contains("FirstGold")) 
+        { 
+            badgeList += "🥇 First Gold | "; 
+            badgeCount++;
+        }
+        if (achievements.Contains("TradeUpMaster")) 
+        { 
+            badgeList += "🔄 Trade Up Master | "; 
+            badgeCount++;
+        }
+        if (achievements.Contains("JackpotWinner")) 
+        { 
+            badgeList += "🎰 Jackpot Winner | "; 
+            badgeCount++;
+        }
+        if (achievements.Contains("CaseCollector")) 
+        { 
+            badgeList += "📦 Case Collector | "; 
+            badgeCount++;
+        }
+        
+        badgeList = badgeList.TrimEnd(' ', '|');
+        CPH.SendMessage("🏆 " + user + " Badges (" + badgeCount + "/4): " + badgeList);
+        return true;
+    }
+}
+ACTION: Trade_Command (!trade)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string sender = args["userName"].ToString();
+        string rawInput = args["rawInput"].ToString();
+        
+        // Parse @username
+        string[] parts = rawInput.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            CPH.SendMessage(sender + " Usage: !trade @username [item number] | First use !inv to see your items numbered");
+            return false;
+        }
+        
+        string target = parts[1].Replace("@", "").Trim();
+        if (parts.Length < 3)
+        {
+            CPH.SendMessage(sender + " Please specify which item to trade (use number from !inv)");
+            return false;
+        }
+        
+        int itemIndex;
+        if (!int.TryParse(parts[2], out itemIndex))
+        {
+            CPH.SendMessage(sender + " Please use a valid item number");
+            return false;
+        }
+        
+        string senderItems = CPH.GetGlobalVar<string>(sender + "_Items");
+        if (string.IsNullOrEmpty(senderItems))
+        {
+            CPH.SendMessage(sender + " Your inventory is empty!");
+            return false;
+        }
+        
+        string[] itemList = senderItems.Split(';');
+        if (itemIndex < 1 || itemIndex > itemList.Length)
+        {
+            CPH.SendMessage(sender + " Invalid item number! Type !inv to see your items numbered 1-" + itemList.Length);
+            return false;
+        }
+        
+        string tradeItem = itemList[itemIndex - 1].Trim();
+        
+        // Check if target exists
+        double targetBalance = CPH.GetGlobalVar<double>(target + "_Balance");
+        if (targetBalance == 0 && CPH.GetGlobalVar<string>(target + "_Items") == null)
+        {
+            CPH.SendMessage(sender + " User @" + target + " hasn't played the bot yet!");
+            return false;
+        }
+        
+        // Store trade offer
+        CPH.SetGlobalVar("Trade_Sender", sender, true);
+        CPH.SetGlobalVar("Trade_Target", target, true);
+        CPH.SetGlobalVar("Trade_Item", tradeItem, true);
+        CPH.SetGlobalVar("Trade_ItemIndex", itemIndex, true);
+        CPH.SetGlobalVar("Trade_Active", "true", true);
+        
+        CPH.SendMessage(sender + " offered to trade " + tradeItem + " to @" + target + " | @" + target + " type !accepttrade to accept or !denytrade to deny (30 seconds)");
+        
+        return true;
+    }
+}
+ACTION: AcceptTrade_Command (!accepttrade)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string target = args["userName"].ToString();
+        string tradeActive = CPH.GetGlobalVar<string>("Trade_Active");
+        
+        if (tradeActive != "true")
+        {
+            CPH.SendMessage(target + " No active trade offer!");
+            return false;
+        }
+        
+        string sender = CPH.GetGlobalVar<string>("Trade_Sender");
+        string tradeTarget = CPH.GetGlobalVar<string>("Trade_Target");
+        
+        if (!target.Equals(tradeTarget, StringComparison.OrdinalIgnoreCase))
+        {
+            CPH.SendMessage(target + " This trade offer is not for you!");
+            return false;
+        }
+        
+        string tradeItem = CPH.GetGlobalVar<string>("Trade_Item");
+        int itemIndex = CPH.GetGlobalVar<int>("Trade_ItemIndex");
+        
+        // Get inventories
+        string senderItems = CPH.GetGlobalVar<string>(sender + "_Items");
+        string targetItems = CPH.GetGlobalVar<string>(target + "_Items");
+        
+        if (string.IsNullOrEmpty(senderItems))
+        {
+            CPH.SendMessage("Trade cancelled - " + sender + " no longer has that item!");
+            CPH.SetGlobalVar("Trade_Active", "false", true);
+            return false;
+        }
+        
+        string[] senderList = senderItems.Split(';');
+        if (itemIndex < 1 || itemIndex > senderList.Length)
+        {
+            CPH.SendMessage("Trade cancelled - item no longer available!");
+            CPH.SetGlobalVar("Trade_Active", "false", true);
+            return false;
+        }
+        
+        // Remove from sender
+        var newSenderList = new List<string>(senderList);
+        newSenderList.RemoveAt(itemIndex - 1);
+        CPH.SetGlobalVar(sender + "_Items", string.Join(";", newSenderList), true);
+        
+        // Add to target
+        string newTargetItems = string.IsNullOrEmpty(targetItems) ? tradeItem : targetItems + ";" + tradeItem;
+        CPH.SetGlobalVar(target + "_Items", newTargetItems, true);
+        
+        CPH.SetGlobalVar("Trade_Active", "false", true);
+        CPH.SendMessage("✅ Trade completed! " + sender + " gave " + tradeItem + " to " + target + "!");
+        return true;
+    }
+}
+ACTION: DenyTrade_Command (!denytrade)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string tradeActive = CPH.GetGlobalVar<string>("Trade_Active");
+        
+        if (tradeActive != "true")
+        {
+            CPH.SendMessage(user + " No active trade offer!");
+            return false;
+        }
+        
+        string sender = CPH.GetGlobalVar<string>("Trade_Sender");
+        string target = CPH.GetGlobalVar<string>("Trade_Target");
+        
+        if (!user.Equals(target, StringComparison.OrdinalIgnoreCase) && !user.Equals(sender, StringComparison.OrdinalIgnoreCase))
+        {
+            CPH.SendMessage(user + " This trade offer doesn't involve you!");
+            return false;
+        }
+        
+        CPH.SetGlobalVar("Trade_Active", "false", true);
+        CPH.SendMessage("❌ Trade cancelled by " + user + "!");
+        return true;
+    }
+}
+ACTION: Gift_Command (!gift)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string sender = args["userName"].ToString();
+        string rawInput = args["rawInput"].ToString();
+        
+        string[] parts = rawInput.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            CPH.SendMessage(sender + " Usage: !gift @username [case name] | Example: !gift @user Dreams");
+            return false;
+        }
+        
+        string target = parts[1].Replace("@", "").Trim();
+        
+        // Check if target exists
+        double targetBalance = CPH.GetGlobalVar<double>(target + "_Balance");
+        if (targetBalance == 0 && CPH.GetGlobalVar<string>(target + "_Items") == null)
+        {
+            CPH.SendMessage(sender + " User @" + target + " hasn't played the bot yet!");
+            return false;
+        }
+        
+        string caseName = "Dreams";
+        if (parts.Length >= 3)
+        {
+            caseName = parts[2].Trim();
+            caseName = char.ToUpper(caseName[0]) + caseName.Substring(1).ToLower();
+        }
+        
+        // Validate case
+        string[] validCases = { "Dreams", "Recoil", "Kilowatt", "Revolution", "Fracture", "Clutch", "Prisma", "DangerZone", "Horizon", "Chroma3", "Spectrum2" };
+        bool isValid = false;
+        foreach (string vc in validCases)
+        {
+            if (caseName.Equals(vc, StringComparison.OrdinalIgnoreCase))
+            {
+                caseName = vc;
+                isValid = true;
+                break;
+            }
+        }
+        
+        if (!isValid)
+        {
+            CPH.SendMessage(sender + " Unknown case: " + caseName + " | Available: Dreams, Recoil, Kilowatt, Revolution, Fracture, Clutch, Prisma, DangerZone, Horizon, Chroma3, Spectrum2");
+            return false;
+        }
+        
+        // Check if target has case unlocked
+        string unlockedCases = CPH.GetGlobalVar<string>(target + "_UnlockedCases");
+        if (string.IsNullOrEmpty(unlockedCases)) unlockedCases = "Dreams;Recoil";
+        
+        if (!unlockedCases.Contains(caseName) && caseName != "Dreams" && caseName != "Recoil")
+        {
+            CPH.SendMessage(sender + " @" + target + " hasn't unlocked " + caseName + " yet! They need to open more cases first.");
+            return false;
+        }
+        
+        // Get cost
+        double cost = 1.50;
+        if (caseName.Equals("Recoil", StringComparison.OrdinalIgnoreCase)) cost = 0.50;
+        else if (caseName.Equals("Fracture", StringComparison.OrdinalIgnoreCase) || 
+                 caseName.Equals("Kilowatt", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (caseName.Equals("Clutch", StringComparison.OrdinalIgnoreCase)) cost = 3.00;
+        else if (caseName.Equals("Prisma", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        else if (caseName.Equals("DangerZone", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        else if (caseName.Equals("Horizon", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (caseName.Equals("Chroma3", StringComparison.OrdinalIgnoreCase)) cost = 2.00;
+        else if (caseName.Equals("Spectrum2", StringComparison.OrdinalIgnoreCase)) cost = 2.50;
+        
+        // Check sender balance
+        double senderBalance = CPH.GetGlobalVar<double>(sender + "_Balance");
+        if (senderBalance < cost)
+        {
+            CPH.SendMessage(sender + " You need $" + cost.ToString("F2") + " to gift a " + caseName + " case! You have $" + senderBalance.ToString("F2"));
+            return false;
+        }
+        
+        // Deduct from sender
+        senderBalance -= cost;
+        CPH.SetGlobalVar(sender + "_Balance", senderBalance, true);
+        
+        // Set up for target to open
+        CPH.SetGlobalVar("User", target, true);
+        CPH.SetGlobalVar("CurrentCase", caseName, true);
+        CPH.SetGlobalVar(target + "_LastCase", caseName, true);
+        
+        CPH.SendMessage("🎁 " + sender + " gifted a " + caseName + " case to " + target + "! Opening now...");
+        
+        // Small delay for drama
+        System.Threading.Thread.Sleep(1000);
+        
+        // Trigger the case opening
+        CPH.RunAction("CS2_OpenCase");
+        
+        return true;
+    }
+}
+ACTION: Jackpot_Command (!jackpot)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string items = CPH.GetGlobalVar<string>(user + "_Items");
+
+        if (string.IsNullOrEmpty(items)) { CPH.SendMessage(user + " your inventory is empty!"); return false; }
+
+        string[] itemList = items.Split(';');
+        var rng = new Random();
+        int index = rng.Next(0, itemList.Length);
+        string contributed = itemList[index].Trim();
+
+        int tickets = 1;
+        if (contributed.Contains("🟡")) tickets = 250;
+        else if (contributed.Contains("🔴")) tickets = 50;
+        else if (contributed.Contains("💗")) tickets = 15;
+        else if (contributed.Contains("🟣")) tickets = 5;
+
+        var newList = new System.Collections.Generic.List<string>(itemList);
+        newList.RemoveAt(index);
+        CPH.SetGlobalVar(user + "_Items", string.Join(";", newList), true);
+
+        string pot = CPH.GetGlobalVar<string>("JackpotPot");
+        string entries = CPH.GetGlobalVar<string>("JackpotEntries");
+
+        string newEntry = user + "~" + contributed + "~" + tickets;
+        pot = string.IsNullOrEmpty(pot) ? newEntry : pot + "§" + newEntry;
+
+        string currentEntries = string.IsNullOrEmpty(entries) ? "" : entries;
+        for (int i = 0; i < tickets; i++)
+            currentEntries += (string.IsNullOrEmpty(currentEntries) ? "" : "§") + user;
+
+        CPH.SetGlobalVar("JackpotPot", pot, true);
+        CPH.SetGlobalVar("JackpotEntries", currentEntries, true);
+
+        string[] potEntries = pot.Split('§');
+        double potValue = 0;
+        foreach (string entry in potEntries)
+        {
+            string[] parts = entry.Split('~');
+            if (parts.Length >= 2)
+            {
+                if (parts[1].Contains("🟡")) potValue += 50.00;
+                else if (parts[1].Contains("🔴")) potValue += 5.00;
+                else if (parts[1].Contains("💗")) potValue += 1.50;
+                else if (parts[1].Contains("🟣")) potValue += 0.50;
+                else potValue += 0.10;
+            }
+        }
+
+        CPH.SendMessage("🎰 " + user + " entered jackpot with " + contributed + " (" + tickets + " tickets) | Pot: $" + potValue.ToString("F2"));
+        return true;
+    }
+}
+ACTION: JackpotInfo_Command (!jackpotinfo)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string pot = CPH.GetGlobalVar<string>("JackpotPot");
+        string entries = CPH.GetGlobalVar<string>("JackpotEntries");
+
+        if (string.IsNullOrEmpty(pot))
+        {
+            CPH.SendMessage("🎰 No active jackpot! Type !jackpot to enter with a random item.");
+            return true;
+        }
+
+        string[] potEntries = pot.Split(new[] { '§' }, StringSplitOptions.RemoveEmptyEntries);
+        var players = new List<string>();
+        double potValue = 0;
+
+        foreach (string entry in potEntries)
+        {
+            string[] parts = entry.Split('~');
+            if (parts.Length >= 2)
+            {
+                string player = parts[0];
+                string item = parts[1];
+                
+                if (!players.Contains(player))
+                    players.Add(player);
+                
+                if (item.Contains("🟡")) potValue += 50.00;
+                else if (item.Contains("🔴")) potValue += 5.00;
+                else if (item.Contains("💗")) potValue += 1.50;
+                else if (item.Contains("🟣")) potValue += 0.50;
+                else potValue += 0.10;
+            }
+        }
+
+        int tickets = 0;
+        if (!string.IsNullOrEmpty(entries))
+        {
+            tickets = entries.Split(new[] { '§' }, StringSplitOptions.RemoveEmptyEntries).Length;
+        }
+        
+        string playerList = string.Join(", ", players);
+        CPH.SendMessage("🎰 Current Jackpot — Players: " + players.Count + " (" + playerList + ") | Items: " + potEntries.Length + " | Pot: $" + potValue.ToString("F2") + " | Tickets: " + tickets);
+        return true;
+    }
+}
+ACTION: Jackpot_Draw (!jackpotdraw — Mods Only)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string entries = CPH.GetGlobalVar<string>("JackpotEntries");
+        string pot = CPH.GetGlobalVar<string>("JackpotPot");
+
+        if (string.IsNullOrEmpty(entries))
+        {
+            CPH.SendMessage("No jackpot entries yet!");
+            return false;
+        }
+
+        string[] entryList = entries.Split(new[] { '§' }, StringSplitOptions.RemoveEmptyEntries);
+        if (entryList.Length == 0)
+        {
+            CPH.SendMessage("No valid jackpot entries!");
+            return false;
+        }
+
+        var rng = new Random();
+        string winner = entryList[rng.Next(0, entryList.Length)];
+
+        string[] potEntries = pot.Split(new[] { '§' }, StringSplitOptions.RemoveEmptyEntries);
+        var winnings = new System.Collections.Generic.List<string>();
+        double potValue = 0;
+
+        foreach (string entry in potEntries)
+        {
+            string[] parts = entry.Split('~');
+            if (parts.Length >= 2)
+            {
+                winnings.Add(parts[1]);
+                if (parts[1].Contains("🟡")) potValue += 50.00;
+                else if (parts[1].Contains("🔴")) potValue += 5.00;
+                else if (parts[1].Contains("💗")) potValue += 1.50;
+                else if (parts[1].Contains("🟣")) potValue += 0.50;
+                else potValue += 0.10;
+            }
+        }
+
+        string winnerItems = CPH.GetGlobalVar<string>(winner + "_Items");
+        string allWinnings = string.Join(";", winnings);
+        
+        if (string.IsNullOrEmpty(winnerItems))
+            CPH.SetGlobalVar(winner + "_Items", allWinnings, true);
+        else
+            CPH.SetGlobalVar(winner + "_Items", winnerItems + ";" + allWinnings, true);
+        
+        // Track jackpot wins for achievements
+        int jackpotWins = CPH.GetGlobalVar<int>(winner + "_JackpotWins");
+        jackpotWins++;
+        CPH.SetGlobalVar(winner + "_JackpotWins", jackpotWins, true);
+
+        CPH.SetGlobalVar("JackpotPot", "", true);
+        CPH.SetGlobalVar("JackpotEntries", "", true);
+
+        CPH.SendMessage("🎰 JACKPOT WINNER! " + winner + " won " + winnings.Count + " items worth $" + potValue.ToString("F2") + "!");
+        return true;
+    }
+}
+ACTION: MyStats_Command (!mystats)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        int total = CPH.GetGlobalVar<int>(user + "_TotalOpened");
+        int golds = CPH.GetGlobalVar<int>(user + "_Golds");
+        double balance = CPH.GetGlobalVar<double>(user + "_Balance");
+        int streak = CPH.GetGlobalVar<int>(user + "_OpenStreak");
+        int tradeups = CPH.GetGlobalVar<int>(user + "_TradeupCount");
+        int jackpotWins = CPH.GetGlobalVar<int>(user + "_JackpotWins");
+        
+        int dreams = CPH.GetGlobalVar<int>(user + "_Dreams_Opened");
+        int recoil = CPH.GetGlobalVar<int>(user + "_Recoil_Opened");
+        int kilowatt = CPH.GetGlobalVar<int>(user + "_Kilowatt_Opened");
+        int revolution = CPH.GetGlobalVar<int>(user + "_Revolution_Opened");
+        int fracture = CPH.GetGlobalVar<int>(user + "_Fracture_Opened");
+        int clutch = CPH.GetGlobalVar<int>(user + "_Clutch_Opened");
+        int prisma = CPH.GetGlobalVar<int>(user + "_Prisma_Opened");
+        int dangerzone = CPH.GetGlobalVar<int>(user + "_DangerZone_Opened");
+        int horizon = CPH.GetGlobalVar<int>(user + "_Horizon_Opened");
+        int chroma3 = CPH.GetGlobalVar<int>(user + "_Chroma3_Opened");
+        int spectrum2 = CPH.GetGlobalVar<int>(user + "_Spectrum2_Opened");
+
+        CPH.SendMessage("🎮 " + user + " — Total: " + total + " | 🟡 Golds: " + golds + " | 🔥 Streak: " + streak + " | 🔄 Trade-ups: " + tradeups + " | 🎰 Jackpot Wins: " + jackpotWins + " | 💰 $" + balance.ToString("F2") + " | Cases: Dreams:" + dreams + " Recoil:" + recoil + " Kilowatt:" + kilowatt + " Revolution:" + revolution + " Fracture:" + fracture + " Clutch:" + clutch + " Prisma:" + prisma + " DZ:" + dangerzone + " Horizon:" + horizon + " Chroma3:" + chroma3 + " Spec2:" + spectrum2);
+        return true;
+    }
+}
+ACTION: CaseStats_Command (!casestats)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        int dreams = CPH.GetGlobalVar<int>("Dreams_Opened");
+        int recoil = CPH.GetGlobalVar<int>("Recoil_Opened");
+        int kilowatt = CPH.GetGlobalVar<int>("Kilowatt_Opened");
+        int revolution = CPH.GetGlobalVar<int>("Revolution_Opened");
+        int fracture = CPH.GetGlobalVar<int>("Fracture_Opened");
+        int clutch = CPH.GetGlobalVar<int>("Clutch_Opened");
+        int prisma = CPH.GetGlobalVar<int>("Prisma_Opened");
+        int dangerzone = CPH.GetGlobalVar<int>("DangerZone_Opened");
+        int horizon = CPH.GetGlobalVar<int>("Horizon_Opened");
+        int chroma3 = CPH.GetGlobalVar<int>("Chroma3_Opened");
+        int spectrum2 = CPH.GetGlobalVar<int>("Spectrum2_Opened");
+
+        CPH.SendMessage("📦 Case Stats — Dreams: " + dreams + " | Recoil: " + recoil + " | Kilowatt: " + kilowatt + " | Revolution: " + revolution + " | Fracture: " + fracture + " | Clutch: " + clutch + " | Prisma: " + prisma + " | DangerZone: " + dangerzone + " | Horizon: " + horizon + " | Chroma3: " + chroma3 + " | Spectrum2: " + spectrum2);
+        return true;
+    }
+}
+ACTION: CaseInfo_Command (!caseinfo)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        CPH.SendMessage("📦 Available Cases — Dreams ($1.50) | Recoil ($0.50) | Kilowatt ($2.00) | Revolution ($1.50) | Fracture ($2.00) | Clutch ($3.00) | Prisma ($2.50) | DangerZone ($2.50) | Horizon ($2.00) | Chroma3 ($2.00) | Spectrum2 ($2.50) — Type !setcase [name] then !case to open!");
+        return true;
+    }
+}
+ACTION: Odds_Command (!odds)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        CPH.SendMessage("🎲 Case Odds — 🟡 Gold: 2.6% | 🔴 Red: 2.5% | 💗 Pink: 2.5% | 🟣 Purple: 5% | 🔷 Blue: 87.4% | StatTrak™: 10% (2x value) | Conditions: FN(5% 2x), MW(15% 1.5x), FT(50% 1x), WW(20% 0.75x), BS(10% 0.5x)");
+        return true;
+    }
+}
+ACTION: InventoryValue_Command (!inventoryvalue)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        string items = CPH.GetGlobalVar<string>(user + "_Items");
+
+        if (string.IsNullOrEmpty(items)) { CPH.SendMessage(user + " your inventory is empty!"); return true; }
+
+        double total = 0;
+        foreach (string item in items.Split(';'))
+        {
+            double value = 0.10;
+            if (item.Contains("🟡")) value = 50.00;
+            else if (item.Contains("🔴")) value = 5.00;
+            else if (item.Contains("💗")) value = 1.50;
+            else if (item.Contains("🟣")) value = 0.50;
+            
+            if (item.Contains("Factory New")) value *= 2.0;
+            else if (item.Contains("Minimal Wear")) value *= 1.5;
+            else if (item.Contains("Well-Worn")) value *= 0.75;
+            else if (item.Contains("Battle-Scarred")) value *= 0.5;
+            
+            if (item.Contains("StatTrak")) value *= 2;
+            
+            total += value;
+        }
+
+        CPH.SendMessage("📦 " + user + "'s Inventory Value: $" + total.ToString("F2"));
+        return true;
+    }
+}
+ACTION: TopInventory_Command (!topinventory)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string allUsers = CPH.GetGlobalVar<string>("AllUsers");
+        if (string.IsNullOrEmpty(allUsers)) { CPH.SendMessage("No users yet!"); return false; }
+
+        string[] users = allUsers.Split('§');
+        var values = new List<KeyValuePair<string, double>>();
+
+        foreach (string u in users)
+        {
+            string items = CPH.GetGlobalVar<string>(u + "_Items");
+            double total = 0;
+            if (!string.IsNullOrEmpty(items))
+            {
+                foreach (string item in items.Split(';'))
+                {
+                    double value = 0.10;
+                    if (item.Contains("🟡")) value = 50.00;
+                    else if (item.Contains("🔴")) value = 5.00;
+                    else if (item.Contains("💗")) value = 1.50;
+                    else if (item.Contains("🟣")) value = 0.50;
+                    
+                    if (item.Contains("Factory New")) value *= 2.0;
+                    else if (item.Contains("Minimal Wear")) value *= 1.5;
+                    else if (item.Contains("Well-Worn")) value *= 0.75;
+                    else if (item.Contains("Battle-Scarred")) value *= 0.5;
+                    
+                    if (item.Contains("StatTrak")) value *= 2;
+                    
+                    total += value;
+                }
+            }
+            values.Add(new KeyValuePair<string, double>(u, total));
+        }
+
+        values.Sort((a, b) => b.Value.CompareTo(a.Value));
+        string msg = "🏆 Highest Inventory Value — ";
+        int count = Math.Min(5, values.Count);
+        for (int i = 0; i < count; i++)
+        {
+            msg += (i + 1) + ". " + values[i].Key + " $" + values[i].Value.ToString("F2");
+            if (i < count - 1) msg += " | ";
+        }
+        CPH.SendMessage(msg);
+        return true;
+    }
+}
+ACTION: TopMoney_Command (!topmoney)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string allUsers = CPH.GetGlobalVar<string>("AllUsers");
+        if (string.IsNullOrEmpty(allUsers)) { CPH.SendMessage("No users yet!"); return false; }
+
+        string[] users = allUsers.Split('§');
+        var balances = new List<KeyValuePair<string, double>>();
+
+        foreach (string u in users)
+        {
+            double bal = CPH.GetGlobalVar<double>(u + "_Balance");
+            balances.Add(new KeyValuePair<string, double>(u, bal));
+        }
+
+        balances.Sort((a, b) => b.Value.CompareTo(a.Value));
+        string msg = "💰 Top Money — ";
+        int count = Math.Min(5, balances.Count);
+        for (int i = 0; i < count; i++)
+        {
+            msg += (i + 1) + ". " + balances[i].Key + " $" + balances[i].Value.ToString("F2");
+            if (i < count - 1) msg += " | ";
+        }
+        CPH.SendMessage(msg);
+        return true;
+    }
+}
+ACTION: TopGolds_Command (!topgolds)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string allUsers = CPH.GetGlobalVar<string>("AllUsers");
+        if (string.IsNullOrEmpty(allUsers)) { CPH.SendMessage("No users yet!"); return false; }
+
+        string[] users = allUsers.Split('§');
+        var golds = new List<KeyValuePair<string, int>>();
+        foreach (string u in users)
+        {
+            int g = CPH.GetGlobalVar<int>(u + "_Golds");
+            if (g > 0) golds.Add(new KeyValuePair<string, int>(u, g));
+        }
+
+        golds.Sort((a, b) => b.Value.CompareTo(a.Value));
+        if (golds.Count == 0) { CPH.SendMessage("Nobody has pulled a gold yet!"); return true; }
+
+        string msg = "🥇 Gold Pull Leaders — ";
+        int count = Math.Min(5, golds.Count);
+        for (int i = 0; i < count; i++)
+        {
+            msg += (i + 1) + ". " + golds[i].Key + " x" + golds[i].Value;
+            if (i < count - 1) msg += " | ";
+        }
+        CPH.SendMessage(msg);
+        return true;
+    }
+}
+ACTION: TopOpens_Command (!topopens)
+csharp
+using System;
+using System.Collections.Generic;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string allUsers = CPH.GetGlobalVar<string>("AllUsers");
+        if (string.IsNullOrEmpty(allUsers)) { CPH.SendMessage("No users yet!"); return false; }
+
+        string[] users = allUsers.Split('§');
+        var opens = new List<KeyValuePair<string, int>>();
+        foreach (string u in users)
+        {
+            int o = CPH.GetGlobalVar<int>(u + "_TotalOpened");
+            if (o > 0) opens.Add(new KeyValuePair<string, int>(u, o));
+        }
+
+        opens.Sort((a, b) => b.Value.CompareTo(a.Value));
+        string msg = "🏆 Most Cases Opened — ";
+        int count = Math.Min(5, opens.Count);
+        for (int i = 0; i < count; i++)
+        {
+            msg += (i + 1) + ". " + opens[i].Key + " x" + opens[i].Value;
+            if (i < count - 1) msg += " | ";
+        }
+        CPH.SendMessage(msg);
+        return true;
+    }
+}
+ACTION: Help_Command (!help)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string user = args["userName"].ToString();
+        
+        CPH.SendMessage("🎮 " + user + " CS2 Case Bot V1.4 — Cases: !setcase [Dreams/Recoil/Kilowatt/Revolution/Fracture/Clutch/Prisma/DangerZone/Horizon/Chroma3/Spectrum2] | !case | !caseinfo | !odds | Economy: !balance | !daily | !sell | !sellall | !inv | !tradeup | !streak | !badges | Trading: !trade | !gift | Jackpot: !jackpot | !jackpotinfo | Stats: !mystats | !casestats | Top: !topmoney | !topinventory | !topgolds | !topopens");
+        
+        return true;
+    }
+}
+ADMIN ACTIONS
+GiveBalance_Command (!givebalance)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string rawInput = args["rawInput"].ToString();
+        
+        // Remove the username mention from rawInput
+        string cleanInput = rawInput;
+        if (cleanInput.StartsWith("@"))
+        {
+            int spaceIndex = cleanInput.IndexOf(' ');
+            if (spaceIndex > 0)
+            {
+                cleanInput = cleanInput.Substring(spaceIndex + 1);
+            }
+        }
+        
+        string[] parts = cleanInput.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        if (parts.Length < 2)
+        {
+            CPH.SendMessage("Usage: !givebalance username amount | Example: !givebalance user 100");
+            return false;
+        }
+        
+        string target = parts[0].Replace("@", "").Trim();
+        double amount;
+        
+        if (!double.TryParse(parts[1], out amount))
+        {
+            CPH.SendMessage("Please specify a valid number! Example: !givebalance " + target + " 100");
+            return false;
+        }
+        
+        double balance = CPH.GetGlobalVar<double>(target + "_Balance");
+        balance += amount;
+        CPH.SetGlobalVar(target + "_Balance", balance, true);
+        CPH.SendMessage("💰 Admin gave " + target + " $" + amount.ToString("F2") + " | New balance: $" + balance.ToString("F2"));
+        return true;
+    }
+}
+TakeBalance_Command (!takebalance)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string rawInput = args["rawInput"].ToString();
+        
+        string cleanInput = rawInput;
+        if (cleanInput.StartsWith("@"))
+        {
+            int spaceIndex = cleanInput.IndexOf(' ');
+            if (spaceIndex > 0)
+            {
+                cleanInput = cleanInput.Substring(spaceIndex + 1);
+            }
+        }
+        
+        string[] parts = cleanInput.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        if (parts.Length < 2)
+        {
+            CPH.SendMessage("Usage: !takebalance username amount | Example: !takebalance user 50");
+            return false;
+        }
+        
+        string target = parts[0].Replace("@", "").Trim();
+        double amount;
+        
+        if (!double.TryParse(parts[1], out amount))
+        {
+            CPH.SendMessage("Please specify a valid number! Example: !takebalance " + target + " 50");
+            return false;
+        }
+        
+        double balance = CPH.GetGlobalVar<double>(target + "_Balance");
+        balance -= amount;
+        
+        if (balance < 0) balance = 0;
+        
+        CPH.SetGlobalVar(target + "_Balance", balance, true);
+        CPH.SendMessage("💰 Admin took $" + amount.ToString("F2") + " from " + target + " | New balance: $" + balance.ToString("F2"));
+        return true;
+    }
+}
+GiveItem_Command (!giveitem)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string rawInput = args["rawInput"].ToString();
+        
+        string cleanInput = rawInput;
+        if (cleanInput.StartsWith("@"))
+        {
+            int spaceIndex = cleanInput.IndexOf(' ');
+            if (spaceIndex > 0)
+            {
+                cleanInput = cleanInput.Substring(spaceIndex + 1);
+            }
+        }
+        
+        string[] parts = cleanInput.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        if (parts.Length < 1)
+        {
+            CPH.SendMessage("Usage: !giveitem username \"Skin Name\" | Example: !giveitem user \"🔷 Nova | Plume\"");
+            return false;
+        }
+        
+        string target = parts[0].Replace("@", "").Trim();
+        
+        int quoteStart = cleanInput.IndexOf('"');
+        int quoteEnd = cleanInput.LastIndexOf('"');
+        
+        if (quoteStart == -1 || quoteEnd == -1 || quoteStart == quoteEnd)
+        {
+            CPH.SendMessage("Please wrap the item name in quotes: !giveitem " + target + " \"Skin Name\"");
+            return true;
+        }
+        
+        string itemName = cleanInput.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
+        
+        string currentItems = CPH.GetGlobalVar<string>(target + "_Items");
+        string newItems = string.IsNullOrEmpty(currentItems) ? itemName : currentItems + ";" + itemName;
+        CPH.SetGlobalVar(target + "_Items", newItems, true);
+        CPH.SendMessage("🎁 Admin gave " + target + " item: " + itemName);
+        return true;
+    }
+}
+ResetUser_Command (!resetuser)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string rawInput = args["rawInput"].ToString();
+        
+        string cleanInput = rawInput;
+        if (cleanInput.StartsWith("@"))
+        {
+            int spaceIndex = cleanInput.IndexOf(' ');
+            if (spaceIndex > 0)
+            {
+                cleanInput = cleanInput.Substring(spaceIndex + 1);
+            }
+        }
+        
+        string target = cleanInput.Replace("@", "").Trim();
+        
+        if (string.IsNullOrEmpty(target))
+        {
+            CPH.SendMessage("Usage: !resetuser username | Example: !resetuser user");
+            return false;
+        }
+        
+        CPH.SetGlobalVar(target + "_Items", "", true);
+        CPH.SetGlobalVar(target + "_Balance", 0.00, true);
+        CPH.SetGlobalVar(target + "_TotalOpened", 0, true);
+        CPH.SetGlobalVar(target + "_Golds", 0, true);
+        CPH.SetGlobalVar(target + "_OpenStreak", 0, true);
+        CPH.SetGlobalVar(target + "_TradeupCount", 0, true);
+        CPH.SetGlobalVar(target + "_JackpotWins", 0, true);
+        CPH.SetGlobalVar(target + "_UnlockedCases", "Dreams;Recoil", true);
+        CPH.SetGlobalVar(target + "_Achievements", "", true);
+        
+        string[] allCases = { "Dreams", "Recoil", "Kilowatt", "Revolution", "Fracture", "Clutch", "Prisma", "DangerZone", "Horizon", "Chroma3", "Spectrum2" };
+        foreach (string caseName in allCases)
+        {
+            string casePrefix = caseName.Replace(" ", "");
+            CPH.SetGlobalVar(target + "_" + casePrefix + "_Opened", 0, true);
+        }
+        
+        CPH.SendMessage("🔄 Admin reset " + target + "'s data!");
+        return true;
+    }
+}
+SetCasePrice_Command (!setcaseprice)
+csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string rawInput = args["rawInput"].ToString();
+        
+        string cleanInput = rawInput;
+        if (cleanInput.StartsWith("@"))
+        {
+            int spaceIndex = cleanInput.IndexOf(' ');
+            if (spaceIndex > 0)
+            {
+                cleanInput = cleanInput.Substring(spaceIndex + 1);
+            }
+        }
+        
+        string[] parts = cleanInput.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        if (parts.Length < 2)
+        {
+            CPH.SendMessage("Usage: !setcaseprice CaseName price | Example: !setcaseprice Dreams 2.50");
+            return false;
+        }
+        
+        string caseName = parts[0];
+        double price;
+        
+        if (!double.TryParse(parts[1], out price))
+        {
+            CPH.SendMessage("Invalid price! Usage: !setcaseprice Dreams 2.50");
+            return false;
+        }
+        
+        string[] validCases = { "Dreams", "Recoil", "Kilowatt", "Revolution", "Fracture", "Clutch", "Prisma", "DangerZone", "Horizon", "Chroma3", "Spectrum2" };
+        bool isValid = false;
+        foreach (string validCase in validCases)
+        {
+            if (caseName.Equals(validCase, StringComparison.OrdinalIgnoreCase))
+            {
+                caseName = validCase;
+                isValid = true;
+                break;
+            }
+        }
+        
+        if (!isValid)
+        {
+            CPH.SendMessage("Unknown case: " + caseName + " | Available: Dreams, Recoil, Kilowatt, Revolution, Fracture, Clutch, Prisma, DangerZone, Horizon, Chroma3, Spectrum2");
+            return false;
+        }
+        
+        CPH.SetGlobalVar("Price_" + caseName, price, true);
+        CPH.SendMessage("💰 Admin set " + caseName + " price to $" + price.ToString("F2"));
+        return true;
+    }
+}
+END OF V1.4 COMPLETE CODE REFERENCE
+
+Created by Mk4gtiguy | Support on Ko-fi: https://ko-fi.com/mk4gtiguy
