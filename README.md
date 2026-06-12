@@ -11,6 +11,8 @@
 
 A complete CS2 case opening bot for Streamer.bot with inventory, economy, jackpot, leaderboards, and 11 cases. Perfect for CS2 streamers who want to add interactive engagement without real money.
 
+**✅ Fully tested and stable!**
+
 ---
 
 ## ⚠️ Disclaimer
@@ -19,7 +21,9 @@ A complete CS2 case opening bot for Streamer.bot with inventory, economy, jackpo
 
 ---
 
-## 🚀 Quick Install
+## 🚀 Quick Install (5 Minutes)
+
+### One-Click Import (Actions)
 
 1. Download [`CS2-Case-Bot-V1.4-Actions.sb`](CS2-Case-Bot-V1.4-Actions.sb)
 2. In Streamer.bot → **Actions** → Right-click → **Import** → Select the file
@@ -28,7 +32,11 @@ A complete CS2 case opening bot for Streamer.bot with inventory, economy, jackpo
 5. Set `!jackpotdraw` and admin commands to **Moderator** permission
 6. Type `!help` in your chat to test!
 
-**That's it! Actions import automatically. Globals take ~5 minutes to add manually.**
+**Actions import automatically. Globals take ~5 minutes to add manually.**
+
+### Manual Setup (For Learning or Modifying)
+
+Follow [`3-setup-guide.md`](3-setup-guide.md) and use the code in [`5-V1.4-Complete-Code-Reference.md`](5-V1.4-Complete-Code-Reference.md)
 
 ---
 
@@ -157,7 +165,6 @@ A complete CS2 case opening bot for Streamer.bot with inventory, economy, jackpo
 | `4-persisted-globals.txt` | Skin lists for copy/paste |
 | `5-V1.4-Complete-Code-Reference.md` | All action C# code |
 | `CS2-Case-Bot-V1.4-Actions.sb` | One-click action import |
-| `CS2-Case-Bot-V1.4-Globals.json` | One-click globals import |
 
 ---
 
@@ -245,6 +252,6 @@ This software is a **fan project** and does not contain any actual gambling or r
 
 | Version | Changes |
 |---------|---------|
-| V1.4 | Added StatTrak, conditions, 5 new cases, trading, gifting, streaks, achievements, case unlocking, sell improvements, admin commands |
+| V1.4 | Added StatTrak, conditions, 5 new cases, trading, gifting, streaks, achievements, case unlocking, sell by number, admin commands |
 | V1.3 | Added case switching, costs, fixed jackpot commands |
 | V1.2 | Initial release |
